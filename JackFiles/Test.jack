@@ -1,3 +1,7 @@
+// This is an EOL comment
+/*
+This is a block comment
+*/
 true
 false
 null

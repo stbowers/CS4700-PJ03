@@ -39,8 +39,8 @@ namespace PJ03
                 }
             }
 
-            // Sort method list by the token level
-            tokenDFAMethods.Sort((x, y) => x.Item2.Level - y.Item2.Level);
+            // Sort method list by the token level, in reverse order
+            tokenDFAMethods.Sort((x, y) => y.Item2.Level - x.Item2.Level);
 
             // Create new list of DFAs and their tokens, by invoking each method
             List<(DFA, string)> dfaList = tokenDFAMethods.ConvertAll(x =>
@@ -57,55 +57,86 @@ namespace PJ03
         /* Each token type has it's own level, by which the DFAs are sorted, so that the first
          * accepting dfa for a string is used (mostly to avoid keywords being categorized as identifiers)
          */
-        #region Comment blocks - level -1
-        [TokenDFAMarker("COMMENT_EOL", -1)]
-        private static DFA lineComment()
+        #region Whitespace - level -1
+        [TokenDFAMarker("WHITESPACE", -1)]
+        private static DFA WHITESPACE()
         {
-            // recognizes the start of a line comment ("//")
+            // recognizes whitespace characters (' ', '\n', '\t', '\r')
             DFA newDFA = new DFA();
 
-            // /, /
+            // Stay in/move to state 0 for all characters
+            for (char ch = (char)0; ch < 127; ch++)
+            {
+                newDFA.Transitions[0, ch] = 0;
+                newDFA.Transitions[1, ch] = 0;
+            }
+
+            // Move to state 1 (accept state) on whitespace
+            newDFA.Transitions[0, ' '] = 1;
+            newDFA.Transitions[0, '\t'] = 1;
+            newDFA.Transitions[0, '\r'] = 1;
+            newDFA.Transitions[0, '\n'] = 1;
+
+            newDFA.AcceptStates.Add(1);
+
+            return newDFA;
+        }
+        #endregion
+
+        #region Comment blocks - level -2
+        [TokenDFAMarker("COMMENT_EOL", -2)]
+        private static DFA lineComment()
+        {
+            // recognizes an eol comment (// ... EOL)
+            DFA newDFA = new DFA();
+
+            // //
             newDFA.Transitions[0, '/'] = 1;
             newDFA.Transitions[1, '/'] = 2;
 
-            newDFA.AcceptStates.Add(2);
+            // Any char
+            for (char ch = (char)0; ch < 127; ch++)
+            {
+                newDFA.Transitions[2, ch] = 2;
+            }
+
+            // EOL
+            // \n
+            newDFA.Transitions[2, '\n'] = 4;
+
+            // \r\n
+            newDFA.Transitions[2, '\r'] = 3;
+            newDFA.Transitions[3, '\n'] = 4;
+
+            newDFA.AcceptStates.Add(4);
 
             return newDFA;
         }
 
-        [TokenDFAMarker("COMMENT_BLK_START", -1)]
+        [TokenDFAMarker("COMMENT_BLK", -2)]
         private static DFA startBlockComment()
         {
-            // recognizes the start of a block comment ("/*")
+            // recognizes a block comment (/* ... */)
             DFA newDFA = new DFA();
 
-            // /, *
+            // /*
             newDFA.Transitions[0, '/'] = 1;
             newDFA.Transitions[1, '*'] = 2;
 
-            newDFA.AcceptStates.Add(2);
-
-            return newDFA;
-        }
-
-        [TokenDFAMarker("COMMENT_BLK_END", -1)]
-        private static DFA endBlockComment()
-        {
-            // recognizes the end of a block comment ("<any-characters>*/")
-            DFA newDFA = new DFA();
-
-            // anything, *, /
-            for (int i = 0; i < 127; i++)
+            // any chars
+            for (char ch = (char)0; ch < 127; ch++)
             {
-                // make all transitions from 0 go to 0
-                newDFA.Transitions[0, i] = 0;
+                newDFA.Transitions[2, ch] = 2;
+
+                // go back to state 2 if you see a * followed by anything other than /
+                newDFA.Transitions[3, ch] = 2;
             }
 
-            // change transition from 0 on '*' to go to 1
-            newDFA.Transitions[0, '*'] = 1;
-            newDFA.Transitions[1, '/'] = 2;
+            // */
+            newDFA.Transitions[2, '*'] = 3;
+            newDFA.Transitions[3, '/'] = 4;
 
-            newDFA.AcceptStates.Add(2);
+            newDFA.AcceptStates.Add(4);
 
             return newDFA;
         }

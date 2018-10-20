@@ -126,9 +126,9 @@ IDENT, Output
 SY_PERIOD, .
 IDENT, printString
 SY_LPAREN, (
-BADTOKEN, "Score:
-INTEGER, 0
-BADTOKEN, ");
+STRING, "Score: 0"
+SY_RPAREN, )
+SY_SEMI, ;
 KW_LET, let
 IDENT, exit
 SY_EQ, =
@@ -375,9 +375,9 @@ IDENT, Output
 SY_PERIOD, .
 IDENT, printString
 SY_LPAREN, (
-BADTOKEN, "Game
-IDENT, Over
-BADTOKEN, ");
+STRING, "Game Over"
+SY_RPAREN, )
+SY_SEMI, ;
 SY_RBRACE, }
 KW_RETURN, return
 SY_SEMI, ;

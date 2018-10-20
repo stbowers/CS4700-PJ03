@@ -19,6 +19,9 @@ namespace PJ03
         // The DFA's current state, start at 0
         System.Byte currentState = 0;
 
+        // The chars that this DFA has read so far
+        string readString = "";
+
         // Constructor
         public DFA()
         {
@@ -38,6 +41,7 @@ namespace PJ03
         public void Step(char transition)
         {
             currentState = Transitions[currentState, transition];
+            readString += transition;
         }
 
         /// <summary>
@@ -49,11 +53,28 @@ namespace PJ03
         }
 
         /// <summary>
+        /// Returns true if the DFA is in any state other than 255 (non-accepting trap state)
+        /// </summary>
+        public bool IsRunning()
+        {
+            return (currentState != 255);
+        }
+
+        /// <summary>
         /// Move DFA back to the start state
         /// </summary>
         public void Reset()
         {
             currentState = 0;
+            readString = "";
+        }
+
+        /// <summary>
+        /// Get the string that has been read so far
+        /// </summary>
+        public string GetReadString()
+        {
+            return readString;
         }
     }
 }

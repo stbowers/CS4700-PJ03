@@ -46,8 +46,6 @@ INTEGER, 8
 INTEGER, 5321
 INTEGER, 5321
 INTEGER, 3
-BADTOKEN, "this
-IDENT, is
-IDENT, a
-IDENT, string
-BADTOKEN, "
+STRING, "this is a string"
+INTEGER, 0
+IDENT, badident

@@ -1,12 +1,11 @@
 ﻿using System;
+using System.IO;
+using System.Collections.Generic;
 
 namespace PJ03
 {
     class Program
     {
-        // Whitespace characters should be used to delimit tokens
-        public static readonly char[] TOKEN_DELIMITERS = new[] { ' ', '\t', '\n', '\r' };
-
         // List of DFAs which recognize a certain token, and what that token is (string to print to token file)
         // Array is ordered by the precedence of each token, so if a string matches two tokens the one with a
         // lower index will be chosen
@@ -35,283 +34,181 @@ namespace PJ03
         public static void ParseJackFile(string jackFile, string tokenFile)
         {
             // Create/clear output token file
-            System.IO.File.WriteAllText(tokenFile, "");
+            File.WriteAllText(tokenFile, "");
 
             // read jack file into string
-            string file = System.IO.File.ReadAllText(jackFile);
+            string file = File.ReadAllText(jackFile);
 
-            // the last recognized token
-            string token = "";
+            // append newline to file string, to ensure the last token is recognized
+            file += '\n';
 
-            // the index at which token was recognized
-            int lastValidIndex = 0;
+            // Get tokens from input file
+            (string, string)[] tokens = TokenizeString(file);
 
-            // the index of the last fully processed char
-            int lastProcessedIndex = -1;
-
-            // The number of characters seen since the last delimiter
-            int charsSinceLastDelimiter = 0;
-
-            // bools to keep track of if we're in a comment block
-            bool inEOLComment = false;
-            bool inBlockComment = false;
-
-            // loop through every character in file
-            for (int i = 0; i < file.Length; i++)
+            // Write tokens to output file
+            foreach ((string tokenType, string token) in tokens)
             {
-                char ch = file[i];
-
-                // If ch is in TOKEN_DELIMETERS, stop reading the current token and write it out
-                if (Array.Find(TOKEN_DELIMITERS, x => x == ch) == ch)
-                {
-                    // If the last processed character is the one before this, increment it
-                    if (lastProcessedIndex == i - 1)
-                    {
-                        lastProcessedIndex++;
-                    }
-
-                    // check if we're currently in a comment section
-                    if (inEOLComment || inBlockComment)
-                    {
-                        // check if we should end the comment section
-                        if (inEOLComment && ch == '\n')
-                        {
-                            inEOLComment = false;
-
-                            // reset token
-                            token = "";
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
-                        else if (inBlockComment && token == "COMMENT_BLK_END")
-                        {
-                            inBlockComment = false;
-
-                            // reset token
-                            token = "";
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
-                    }
-                    // Check for beginning comment section
-                    else if (token == "COMMENT_EOL")
-                    {
-                        inEOLComment = true;
-                    }
-                    else if (token == "COMMENT_BLK_START")
-                    {
-                        inBlockComment = true;
-                    }
-                    // If not a comment, check if we actually recognzied any token
-                    else if (token != "")
-                    {
-                        // write token
-                        string tokenLine = String.Format("{0}, {1}\n", token, file.Substring(lastProcessedIndex + 1, (lastValidIndex + 1) - (lastProcessedIndex + 1)));
-                        System.IO.File.AppendAllText(tokenFile, tokenLine);
-
-                        // reset token
-                        token = "";
-                        lastProcessedIndex = lastValidIndex;
-
-                        // move processing back to right after the token that was read, so we can continue reading the line if there is more
-                        i = lastValidIndex;
-                    }
-                    // If we didn't recongize a token, check if we've read any characters since the last recongized token
-                    else
-                    {
-                        if (charsSinceLastDelimiter > 0)
-                        {
-                            // if we have read any characters since the last valid token, print out a BADTOKEN
-                            string tokenLine = String.Format("BADTOKEN, {0}\n", file.Substring(lastProcessedIndex + 1, i - (lastProcessedIndex + 1)));
-                            System.IO.File.AppendAllText(tokenFile, tokenLine);
-
-                            // reset token
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
-
-                        // If we didn't read any characters since the last valid token, we've just finish reading all tokens util the current
-                        // delimeter, and we can continue
-                    }
-
-                    // reset DFAs
-                    foreach ((DFA dfa, string str) in TOKEN_DFAS)
-                    {
-                        dfa.Reset();
-                    }
-
-                    // reset charsSinceLastDelimiter
-                    charsSinceLastDelimiter = 0;
-                }
-                // Otherwise, process char as part of a token
-                else
-                {
-                    // if char isn't delimiter, add to charsSinceLastDelimiter
-                    charsSinceLastDelimiter++;
-
-                    // we should only accept the first token we find for this length,
-                    // but we still need to feed the char to all DFAs, so keep track
-                    // of if we've found a token, and don't accept new tokens
-                    // if we have
-                    bool tokenFound = false;
-
-                    // Simulate all token DFAs on this character
-                    foreach ((DFA dfa, string recognizedToken) in TOKEN_DFAS)
-                    {
-                        dfa.Step(ch);
-
-                        // if the dfa accepts the string thusfar, and no higher precident tokens were found for this length, rewrite token
-                        if (dfa.DoesAccept() && !tokenFound)
-                        {
-                            token = recognizedToken;
-                            lastValidIndex = i;
-
-                            tokenFound = true;
-                        }
-                    }
-                }
+                File.AppendAllText(
+                    tokenFile,
+                    String.Format("{0}, {1}\n", tokenType, token)
+                );
             }
         }
 
-        public static void _ParseJackFile(string jackFile, string tokenFile)
+        public static (string tokenType, string token)[] TokenizeString(string file)
         {
-            // Create/clear output token file
-            System.IO.File.WriteAllText(tokenFile, "");
+            // Reset DFAs
+            ResetDFAs();
 
-            // read jack file into string
-            string file = System.IO.File.ReadAllText(jackFile);
+            // List of matched tokens
+            List<(string, string)> matchedTokens = new List<(string, string)>();
 
-            // the last recognized token
-            string token = "";
-
-            // the index at which token was recognized
-            int lastValidIndex = 0;
-
-            // the index of the last fully processed char
-            int lastProcessedIndex = -1;
-
-            // The number of characters seen since the last delimiter
-            int charsSinceLastDelimiter = 0;
-
-            // bools to keep track of if we're in a comment block
-            bool inEOLComment = false;
-            bool inBlockComment = false;
+            // The last token recognized
+            string lastTokenType = "";
+            string lastTokenText = "";
 
             // loop through every character in file
-            for (int i = 0; i < file.Length; i++)
+            foreach (char ch in file)
             {
-                char ch = file[i];
+                // The token type which best matches the string read thusfar
+                string bestMatch = "";
 
-                // If ch is in TOKEN_DELIMETERS, stop reading the current token and write it out
-                if (Array.Find(TOKEN_DELIMITERS, x => x == ch) == ch)
+                // The string that matched the token
+                string match = "";
+
+                // Flag for if any machines are still running (not in state 255/non accepting trap state)
+                bool machinesRunning = false;
+
+                /* Simulate all token DFAs - the array is sorted by which token types
+                 * should take precidence, so the last accepting DFA that is run should
+                 * be used
+                 */
+                (bestMatch, match, machinesRunning) = RunDFAs(ch);
+
+                if (bestMatch == "WHITESPACE")
                 {
-                    // If the last processed character is the one before this, increment it
-                    if (lastProcessedIndex == i - 1)
+                    /* Check if any machines are still running, (some machines like comments or strings recognize whitespace)
+                     * and if none are, that means this whitespace should be used to delimit a token, so add last recognized
+                     * token to the list of matched tokens
+                     */
+                    if (!machinesRunning && (lastTokenType != ""))
                     {
-                        lastProcessedIndex++;
+                        matchedTokens.Add((lastTokenType, lastTokenText));
+
+                        // reset last token
+                        lastTokenType = "";
+                        lastTokenText = "";
+
+                        // reset DFAs
+                        ResetDFAs();
                     }
 
-                    // check if we're currently in a comment section
-                    if (inEOLComment || inBlockComment)
+                    if (!machinesRunning)
                     {
-                        // check if we should end the comment section
-                        if (inEOLComment && ch == '\n')
-                        {
-                            inEOLComment = false;
-
-                            // reset token
-                            token = "";
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
-                        else if (inBlockComment && token == "COMMENT_BLK_END")
-                        {
-                            inBlockComment = false;
-
-                            // reset token
-                            token = "";
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
+                        ResetDFAs();
                     }
-                    // Check for beginning comment section
-                    else if (token == "COMMENT_EOL")
-                    {
-                        inEOLComment = true;
-                    }
-                    else if (token == "COMMENT_BLK_START")
-                    {
-                        inBlockComment = true;
-                    }
-                    // If not a comment, check if we actually recognzied any token
-                    else if (token != "")
-                    {
-                        // write token
-                        string tokenLine = String.Format("{0}, {1}\n", token, file.Substring(lastProcessedIndex + 1, (lastValidIndex + 1) - (lastProcessedIndex + 1)));
-                        System.IO.File.AppendAllText(tokenFile, tokenLine);
+                }
+                else if (bestMatch == "COMMENT_EOL" || bestMatch == "COMMENT_BLK")
+                {
+                    // Input matched a comment, don't tokenize coments
 
-                        // reset token
-                        token = "";
-                        lastProcessedIndex = lastValidIndex;
-
-                        // move processing back to right after the token that was read, so we can continue reading the line if there is more
-                        i = lastValidIndex;
-                    }
-                    // If we didn't recongize a token, check if we've read any characters since the last recongized token
-                    else
-                    {
-                        if (charsSinceLastDelimiter > 0)
-                        {
-                            // if we have read any characters since the last valid token, print out a BADTOKEN
-                            string tokenLine = String.Format("BADTOKEN, {0}\n", file.Substring(lastProcessedIndex + 1, i - (lastProcessedIndex + 1)));
-                            System.IO.File.AppendAllText(tokenFile, tokenLine);
-
-                            // reset token
-                            lastProcessedIndex = i;
-                            lastValidIndex = i;
-                        }
-
-                        // If we didn't read any characters since the last valid token, we've just finish reading all tokens util the current
-                        // delimeter, and we can continue
-                    }
+                    // reset last token
+                    lastTokenType = "";
+                    lastTokenText = "";
 
                     // reset DFAs
-                    foreach ((DFA dfa, string str) in TOKEN_DFAS)
-                    {
-                        dfa.Reset();
-                    }
-
-                    // reset charsSinceLastDelimiter
-                    charsSinceLastDelimiter = 0;
+                    ResetDFAs();
                 }
-                // Otherwise, process char as part of a token
-                else
+                else if (bestMatch == "" && !machinesRunning)
                 {
-                    // if char isn't delimiter, add to charsSinceLastDelimiter
-                    charsSinceLastDelimiter++;
-
-                    // we should only accept the first token we find for this length,
-                    // but we still need to feed the char to all DFAs, so keep track
-                    // of if we've found a token, and don't accept new tokens
-                    // if we have
-                    bool tokenFound = false;
-
-                    // Simulate all token DFAs on this character
-                    foreach ((DFA dfa, string recognizedToken) in TOKEN_DFAS)
+                    // If the input didn't match any tokens, and no machines are still running
+                    if (lastTokenType != "")
                     {
-                        dfa.Step(ch);
+                        // if we did find a token earlier in the string, add it to list
+                        matchedTokens.Add((lastTokenType, lastTokenText));
 
-                        // if the dfa accepts the string thusfar, and no higher precident tokens were found for this length, rewrite token
-                        if (dfa.DoesAccept() && !tokenFound)
+                        // reset DFAs, and run them on ch again
+                        ResetDFAs();
+                        (bestMatch, match, machinesRunning) = RunDFAs(ch);
+
+                        // If a match was found for this char, set lastToken
+                        if (bestMatch != "")
                         {
-                            token = recognizedToken;
-                            lastValidIndex = i;
+                            lastTokenType = bestMatch;
+                            lastTokenText = match;
 
-                            tokenFound = true;
+                            // If no machines are running anymore, write token
+                            if (!machinesRunning)
+                            {
+                                matchedTokens.Add((lastTokenType, lastTokenText));
+
+                                // reset last token
+                                lastTokenType = "";
+                                lastTokenText = "";
+
+                                // reset DFAs
+                                ResetDFAs();
+                            }
                         }
                     }
+                    else
+                    {
+                        // If the input didn't match any tokens, and no machines are still running, assume current token is bad
+                        lastTokenType = "BADTOKEN";
+                        lastTokenText += ch;
+                    }
+                }
+                else if (bestMatch != "")
+                {
+                    // Otherwise, remember string thusfar matched bestMatch
+                    lastTokenType = bestMatch;
+                    lastTokenText = match;
                 }
             }
+
+            return matchedTokens.ToArray();
+        }
+
+        /// <summary>
+        /// Reset all DFAs to their start state
+        /// </summary>
+        public static void ResetDFAs()
+        {
+            foreach ((DFA machine, string recognizedToken) in TOKEN_DFAS)
+            {
+                machine.Reset();
+            }
+        }
+
+        /// <summary>
+        /// Simulate all token DFAs with the given character
+        /// </summary>
+        /// <returns>A tuple of (the best match for the token type, are any non-accepting machines still running (might accept later))</returns>
+        public static (string bestMatch, string match, bool machinesRunning) RunDFAs(char ch)
+        {
+            string bestMatch = "";
+            string match = "";
+            bool machinesRunning = false;
+
+            foreach ((DFA machine, string recognizedToken) in TOKEN_DFAS)
+            {
+                machine.Step(ch);
+
+                // If the machine accepts save the token it recognizes
+                if (machine.DoesAccept())
+                {
+                    bestMatch = recognizedToken;
+                    match = machine.GetReadString();
+                }
+
+                // If the machine is still running (not in a trap state), and is not the whitespace machine, set machinesRunning flag
+                if (machine.IsRunning() && recognizedToken != "WHITESPACE")
+                {
+                    machinesRunning = true;
+                }
+            }
+
+            return (bestMatch, match, machinesRunning);
         }
     }
 }
